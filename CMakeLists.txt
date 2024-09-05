@@ -9,12 +9,9 @@ enable_language(C CXX ASM)
 target_compile_features(${TARGET_ELF} PRIVATE cxx_std_17)
 
 add_subdirectory(wch)
+add_subdirectory(arduino)
+add_subdirectory(lib)
 
-target_link_libraries(${TARGET_ELF} m)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/romfs.c
-    COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/wch/rtthread/tools/mkromfs.py ${RT_DFS_ROMFS_PATH} ${CMAKE_CURRENT_BINARY_DIR}/romfs.c)
 add_custom_command(TARGET ${TARGET_ELF} POST_BUILD
     COMMAND ${CROSS_OBJDUMP} "-CdSx" $<TARGET_FILE:${TARGET_ELF}> > $<TARGET_FILE:${TARGET_ELF}>.lst
     COMMENT "Generating disassembler file")

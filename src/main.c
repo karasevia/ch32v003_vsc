@@ -1,70 +1,80 @@
-/********************************** (C) COPYRIGHT *******************************
- * File Name          : main.c
- * Author             : WCH
- * Version            : V1.0.0
- * Date               : 2022/08/08
- * Description        : Main program body.
-*********************************************************************************
-* Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
-* Attention: This software (modified or not) and binary are used for 
-* microcontroller manufactured by Nanjing Qinheng Microelectronics.
-*******************************************************************************/
+#include "arduino.h"
+#include "oled.h"
+#include "string.h"
+#include "ik_ina219.h"
+// the setup function runs once when you press reset or power the board
 
-/*
- *@Note
- GPIO routine:
- PD0 push-pull output.
-
-*/
-
-#include "debug.h"
-
-
-/* Global define */
-
-/* Global Variable */
-
-/*********************************************************************
- * @fn      GPIO_Toggle_INIT
- *
- * @brief   Initializes GPIOD.0
- *
- * @return  none
- */
-void GPIO_Toggle_INIT(void)
-{
-    GPIO_InitTypeDef GPIO_InitStructure = {0};
-
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD, ENABLE);
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOD, &GPIO_InitStructure);
+void setup() {
+  // initialize digital pin LED_BUILTIN as an output.
+    Serial_begin(460800);
+    printf("hello oled\r\n");
+    pinMode(LED_BUILTIN, OUTPUT);
+    pinMode(D2, INPUT_PULLDOWN);
+    pinMode(C3, INPUT_PULLUP);
+    pinMode(C4, INPUT_PULLUP);
+	INA219_Init(INA219_ADDRESS, 80000);
+	oledInit(0x3c, 80000);
+	oledFill(0);
 }
 
-/*********************************************************************
- * @fn      main
- *
- * @brief   Main program.
- *
- * @return  none
- */
-int main(void)
-{
-    
-    u8 i = 0;
+// the loop function runs over and over again forever
 
-    // NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
-    Delay_Init();
-    // USART_Printf_Init(115200);
-    // printf("SystemClk:%d\r\n", SystemCoreClock);
+static uint8_t mode = 0;
+static int16_t current_calibration = 0;
 
-    // printf("GPIO Toggle TEST\r\n");
-    GPIO_Toggle_INIT();
-
-    while(1)
-    {
-        Delay_Ms(250);
-        GPIO_WriteBit(GPIOD, GPIO_Pin_0, (i == 0) ? (i = Bit_SET) : (i = Bit_RESET));
+void print_current(const char* prefix, int16_t current, uint8_t y) {
+    char msg[30] = {0};
+    if (current < 1000 && current > -1000) {
+        sprintf(msg, "%s  %3d uA ", prefix, current);
+    } else {
+        uint8_t plus = current > 0;
+        current = current > 0 ? current : -current;
+        sprintf(msg, "%s %s%2d.%01d mA   ",prefix,  plus ? " " : "-", current/1000, (current%1000)/100 );
     }
+    oledWriteString(0, y, msg, FONT_12x16, 0);
+}
+
+void print_voltage(uint16_t voltage)
+{
+    char msg[30] = {0};
+    sprintf(msg, "V %2d.%03d v", voltage / 1000, voltage % 1000);
+    oledWriteString(0, 0, msg, FONT_12x16, 0);
+}
+
+void loop() {
+	static uint8_t led = 0;
+	uint16_t bus_voltage = INA219_ReadBusVoltage();
+	int16_t current = -INA219_ReadCurrent();
+
+	digitalWrite(LED_BUILTIN, led = !led);
+
+	if (mode == 0) {
+		print_voltage(bus_voltage);
+		print_current("I", current - current_calibration, 24);
+	} else if (mode == 1) {
+		print_current("C", current_calibration, 0);
+		print_current("R", current, 24);
+	}
+
+	if (!digitalRead(C3)) {
+		printf("button C3\r\n");
+		if (mode == 1) {
+			mode = 0;
+			oledFill(0);
+		}
+	}
+
+	if (!digitalRead(C4)) {
+		printf("button C4\r\n");
+		if (mode == 1) {
+			current_calibration = current;
+		}
+		if (mode == 0) {
+			mode = 1;
+			oledFill(0);
+		}
+	}
+	printf(">voltage:%d,current:%d\r\n", bus_voltage, current - current_calibration);
+	
+	//printf("voltage: %d mv, current: %d uA\r\n", bus_voltage, current);
 }

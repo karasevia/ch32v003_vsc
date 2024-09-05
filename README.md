@@ -14,7 +14,7 @@ This project provide a functional cmake/ninja project for ch32v003 MCU using sta
 
  - Create `build` directory with `mkdir build` and move to it (`cd build`)
  - Generate cmake project using ninja (or your preferred tool): `cmake ../ -G Ninja`
- - If you prefer gnu make try `cmake ../ -G 'Unix Makefile'` (or replace to your preferred tool)
+ - If you prefer gnu make try `cmake ../ -G 'Unix Makefiles'` (or replace to your preferred tool)
  - Launch ninja to build all of code: `ninja`
  - If all pass ok, the files `firmware.elf`, `firmware.elf.bin` and `firmware.elf.hex` appears in `build` directory
  - Additionally, you may found the files `firmware.elf.map` and `firmware.elf.lst` containing memory mapping and disassembler of the ELF file
