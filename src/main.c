@@ -12,8 +12,8 @@ void setup() {
     pinMode(D2, INPUT_PULLDOWN);
     pinMode(C3, INPUT_PULLUP);
     pinMode(C4, INPUT_PULLUP);
-	INA219_Init(INA219_ADDRESS, 80000);
-	oledInit(0x3c, 80000);
+	INA219_Init(INA219_ADDRESS, 400000);
+	oledInit(0x3c, 400000);
 	oledFill(0);
 }
 
@@ -43,6 +43,7 @@ void print_voltage(uint16_t voltage)
 
 void loop() {
 	static uint8_t led = 0;
+	static uint8_t last_c4 = 0;
 	uint16_t bus_voltage = INA219_ReadBusVoltage();
 	int16_t current = -INA219_ReadCurrent();
 
@@ -64,7 +65,8 @@ void loop() {
 		}
 	}
 
-	if (!digitalRead(C4)) {
+	uint8_t c4 = !digitalRead(C4);
+	if (c4 && c4 != last_c4) {
 		printf("button C4\r\n");
 		if (mode == 1) {
 			current_calibration = current;
@@ -74,5 +76,7 @@ void loop() {
 			oledFill(0);
 		}
 	}
+	last_c4 = c4;
+	
 	printf(">voltage:%d,current:%d\r\n", bus_voltage, current - current_calibration);
 }
