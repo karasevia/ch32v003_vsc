@@ -75,6 +75,4 @@ void loop() {
 		}
 	}
 	printf(">voltage:%d,current:%d\r\n", bus_voltage, current - current_calibration);
-	
-	//printf("voltage: %d mv, current: %d uA\r\n", bus_voltage, current);
 }

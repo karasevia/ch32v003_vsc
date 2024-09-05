@@ -17,10 +17,10 @@
 
 //#define SYSCLK_FREQ_8MHz_HSI    8000000
 //#define SYSCLK_FREQ_24MHZ_HSI   HSI_VALUE
-//#define SYSCLK_FREQ_48MHZ_HSI   48000000
+#define SYSCLK_FREQ_48MHZ_HSI   48000000
 //#define SYSCLK_FREQ_8MHz_HSE    8000000
 //#define SYSCLK_FREQ_24MHz_HSE   HSE_VALUE
-#define SYSCLK_FREQ_48MHz_HSE   48000000
+//#define SYSCLK_FREQ_48MHz_HSE   48000000
 
 /* Clock Definitions */
 #ifdef SYSCLK_FREQ_8MHz_HSI
@@ -154,7 +154,7 @@ static void SetSysClock(void)
     SetSysClockTo_48MHz_HSE();
 #endif
  
- /* If none of the define above is enabled, the HSI is used as System clock£¬
+ /* If none of the define above is enabled, the HSI is used as System clockï¿½ï¿½
   * source (default after reset) 
 	*/ 
 }
