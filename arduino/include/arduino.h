@@ -54,9 +54,7 @@ enum {
 #define memcpy_P memcpy
 #define pgm_read_byte(s) *(uint8_t *)s
 #define pgm_read_word(s) *(uint16_t *)s
-
-void Serial_begin(uint32_t baudrate);
-void Serial_println(const char *serialmessage);
+#define serial_baudrate 460800
 
 // Wrapper methods
 void delay(unsigned int i);

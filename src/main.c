@@ -6,7 +6,6 @@
 
 void setup() {
   // initialize digital pin LED_BUILTIN as an output.
-    Serial_begin(460800);
     printf("hello oled\r\n");
     pinMode(LED_BUILTIN, OUTPUT);
     pinMode(D2, INPUT_PULLDOWN);
@@ -77,6 +76,6 @@ void loop() {
 		}
 	}
 	last_c4 = c4;
-	
+
 	printf(">voltage:%d,current:%d\r\n", bus_voltage, current - current_calibration);
 }

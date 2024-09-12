@@ -4,9 +4,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "cmake clean",
+            "label": "flash with bootloader",
             "type": "shell",
-            "command": "cmake --build ${command:cmake.buildDirectory} --config Debug --target clean"
+            "command": "\"C:\\work\\V003\\projects\\ch32v0-uprog.exe\"  --baud 460800 --device COM18 .\\build\\firmware.elf.bin"
         },
         {
             "label": "cmake build",
@@ -15,50 +15,11 @@
             "problemMatcher": "$gcc"
         },
         {
-            "label": "cmake remove build",
-            "type": "shell",
-            "command": "rm -fr ${command:cmake.buildDirectory}"
-        },
-        {
-            "label": "flash to device",
-            "type": "shell",
-            "options": {
-                "env": {
-                    "ELF_NAME": "${command:cmake.getLaunchTargetPath}"
-                }
-            },
-            "linux": {
-                "command": "${config:cortex-debug.openocdPath.linux}"
-            },
-            "windows": {
-                "command": "${config:cortex-debug.openocdPath.windows}"
-            },
-            "args": [
-                "-f${workspaceFolder}/wch/wch-riscv.cfg",
-                "-f${workspaceFolder}/wch/wch-program.cfg"
-            ],
-            "dependsOn": "cmake build"
-        },
-        {
-            "label": "reset device",
-            "type": "shell",
-            "linux": {
-                "command": "${config:cortex-debug.openocdPath.linux}"
-            },
-            "windows": {
-                "command": "${config:cortex-debug.openocdPath.windows}"
-            },
-            "args": [
-                "-f${workspaceFolder}/wch/wch-riscv.cfg",
-                "-f${workspaceFolder}/wch/wch-reset.cfg"
-            ]
-        },
-        {
-            "label": "rebuild",
+            "label": "update fw",
             "dependsOrder": "sequence",
             "dependsOn": [
-                "cmake clean",
-                "cmake build"
+                "cmake build",
+                "flash with bootloader"
             ]
         }
     ]

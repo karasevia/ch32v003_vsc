@@ -7,37 +7,15 @@
 #include "debug.h"
 #include "arduino.h"
 
-void GPIO_Toggle_INIT(void)
+void GPIO_PD1_PA1_PA2_C0_Init(void)
 {
-    GPIO_InitTypeDef GPIO_InitStructure = {0};
-
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD, ENABLE);
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-
-    GPIO_Init(GPIOD, &GPIO_InitStructure);
-
-    { // init D1 as GPIO
-        GPIOD->CFGLR &= ~( 0b11 << 6 );\
-        u32 tmp = AFIO->PCFR1 & (~(0b111 << 24));
-        tmp |= 0b100 << 24;
-        AFIO->PCFR1 |= tmp;
-    }
-
-    { // init A1 A2 as GPIO
-        AFIO->PCFR1 &= ~0x8000;
-    }
-}
-
-void EXTI0_INT_INIT(void)
-{
-    GPIO_InitTypeDef GPIO_InitStructure = {0};
+    GPIO_InitTypeDef GPIO_InitStructure = {0};    
     EXTI_InitTypeDef EXTI_InitStructure = {0};
     NVIC_InitTypeDef NVIC_InitStructure = {0};
 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO | RCC_APB2Periph_GPIOC, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO | RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD, ENABLE);
 
+    /* PC0 - boot button */
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
     GPIO_Init(GPIOC, &GPIO_InitStructure);
@@ -55,20 +33,85 @@ void EXTI0_INT_INIT(void)
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
+
+    { // init D1 as GPIO
+        GPIOD->CFGLR &= ~( 0b11 << 6 );\
+        u32 tmp = AFIO->PCFR1 & (~(0b111 << 24));
+        tmp |= 0b100 << 24;
+        AFIO->PCFR1 |= tmp;
+    }
+
+    { // init A1 A2 as GPIO
+        AFIO->PCFR1 &= ~0x8000;
+    }
+
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+    GPIO_Init(GPIOD, &GPIO_InitStructure);
+
+
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
 }
 
-int main(void){
+static u8 RxBuffer1[128] = {0};
+
+/*********************************************************************
+ * @fn      DMA_INIT
+ *
+ * @brief   Configures the DMA for USART1.
+ *
+ * @return  none
+ */
+void DMA_INIT(void)
+{
+    DMA_InitTypeDef DMA_InitStructure = {0};
+    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
+
+    DMA_DeInit(DMA1_Channel5);
+    DMA_InitStructure.DMA_PeripheralBaseAddr = (u32)(&USART1->DATAR);
+    DMA_InitStructure.DMA_MemoryBaseAddr = (u32)RxBuffer1;
+    DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
+    DMA_InitStructure.DMA_BufferSize = sizeof(RxBuffer1);
+    DMA_Init(DMA1_Channel5, &DMA_InitStructure);
+}
+
+int main(void)
+{
     Delay_Init();
-    EXTI0_INT_INIT();
-    GPIO_Toggle_INIT();
+    GPIO_PD1_PA1_PA2_C0_Init();
+
+    DMA_INIT();
+    USART_Printf_Init(serial_baudrate);
+    USART_DMACmd(USART1, USART_DMAReq_Rx, ENABLE);
+
     setup();
-    while(1){
+    while(1)
+    {
         loop();
+        if (DMA_GetFlagStatus(DMA1_FLAG_TC5) != RESET) {
+            DMA_ClearFlag(DMA1_FLAG_TC5);
+            uint16_t cnt = DMA_GetCurrDataCounter(DMA1_Channel5);
+            printf("DMA_GetFlagStatus %d\r\n", cnt);
+        }
     }
 }
 
 void EXTI7_0_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 
+void reboot_bootloader()
+{
+    RCC_ClearFlag();
+    SystemReset_StartMode(Start_Mode_BOOT);
+    NVIC_SystemReset();
+}
 /*********************************************************************
  * @fn      EXTI0_IRQHandler
  *
@@ -82,14 +125,8 @@ void EXTI7_0_IRQHandler(void)
     if(EXTI_GetITStatus(EXTI_Line0)!=RESET)
     {
         EXTI_ClearITPendingBit(EXTI_Line0);     /* Clear Flag */
-        RCC_ClearFlag();
-        SystemReset_StartMode(Start_Mode_BOOT);
-        NVIC_SystemReset();
+        reboot_bootloader();
     }
-}
-
-void Serial_begin(uint32_t baudrate){
-    USART_Printf_Init(baudrate);
 }
 
 void delay(unsigned int i)
@@ -97,16 +134,18 @@ void delay(unsigned int i)
 	Delay_Ms(i);
 }
 
-void delayMicroseconds(unsigned int us){
-
+void delayMicroseconds(unsigned int us)
+{
     Delay_Us(us);
 }
 
-unsigned long micros(void){
+unsigned long micros(void)
+{
     return Systick_micros();
 }
 
-unsigned long millis(void){
+unsigned long millis(void)
+{
     return Systick_micros()/1000;
 }
 // Arduino-like API defines and function wrappers for WCH MCUs
@@ -217,40 +256,3 @@ void Standby82ms(uint8_t iTicks)
     GPIO_DeInit(GPIOD);
 
 } /* Standby82ms() */
-
-//
-// Ramp an LED brightness with PWM from 0 to 50%
-// The period represents the total up+down time in milliseconds
-//
-void breatheLED(uint8_t u8Pin, int iPeriod)
-{
-	int i, j, iStep, iCount, iOnTime;
-
-	pinMode(u8Pin, OUTPUT);
-	// Use a pwm freq of 1000hz and 50 steps up then 50 steps down
-	iStep = 10000/iPeriod; // us per step
-	iCount = iPeriod / 20;
-	// ramp up
-	iOnTime = 0;
-	for (i=0; i<iCount; i++) {
-		for (j=0; j<20; j++) { // 20ms per step
-			digitalWrite(u8Pin, 1); // on period
-			Delay_Us(iOnTime);
-			digitalWrite(u8Pin, 0); // off period
-			Delay_Us(1000 - iOnTime);
-		} // for j
-		iOnTime += iStep;
-	} // for i
-	// ramp down
-	iOnTime = 500;
-	for (i=0; i<iCount; i++) {
-		for (j=0; j<20; j++) { // 20ms per step
-			digitalWrite(u8Pin, 1); // on period
-			Delay_Us(iOnTime);
-			digitalWrite(u8Pin, 0); // off period
-			Delay_Us(1000 - iOnTime);
-		} // for j
-		iOnTime -= iStep;
-	} // for i
-} /* breatheLED() */
-
