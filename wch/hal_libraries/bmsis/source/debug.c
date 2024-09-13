@@ -107,8 +107,6 @@ void USART_Printf_Init(uint32_t baudrate)
 
     USART_Init(USART1, &USART_InitStructure);
     USART_Cmd(USART1, ENABLE);
-
-    DMA_Cmd(DMA1_Channel5, ENABLE); /* USART1 Rx */
 }
 
 /*********************************************************************

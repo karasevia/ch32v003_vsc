@@ -6,6 +6,7 @@
  */
 #include "debug.h"
 #include "arduino.h"
+#include "ch32v00x_dma.h"
 
 void GPIO_PD1_PA1_PA2_C0_Init(void)
 {
@@ -61,7 +62,7 @@ void GPIO_PD1_PA1_PA2_C0_Init(void)
 
 }
 
-static u8 RxBuffer1[128] = {0};
+static u8 RxDmaBuffer[30] = {0};
 
 /*********************************************************************
  * @fn      DMA_INIT
@@ -76,11 +77,26 @@ void DMA_INIT(void)
     RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
 
     DMA_DeInit(DMA1_Channel5);
+    DMA_StructInit(&DMA_InitStructure);
     DMA_InitStructure.DMA_PeripheralBaseAddr = (u32)(&USART1->DATAR);
-    DMA_InitStructure.DMA_MemoryBaseAddr = (u32)RxBuffer1;
+    DMA_InitStructure.DMA_MemoryBaseAddr = (u32)RxDmaBuffer;
+    
     DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
-    DMA_InitStructure.DMA_BufferSize = sizeof(RxBuffer1);
+    DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+    DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
+    DMA_InitStructure.DMA_Priority = DMA_Priority_VeryHigh;
+    DMA_InitStructure.DMA_BufferSize = sizeof(RxDmaBuffer);
+
+    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
+    DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
+
     DMA_Init(DMA1_Channel5, &DMA_InitStructure);
+    DMA_Cmd(DMA1_Channel5, ENABLE); /* USART1 Rx */
+}
+
+uint8_t get_dma_count()
+{
+    return sizeof(RxDmaBuffer) - DMA_GetCurrDataCounter(DMA1_Channel5);
 }
 
 int main(void)
@@ -93,14 +109,22 @@ int main(void)
     USART_DMACmd(USART1, USART_DMAReq_Rx, ENABLE);
 
     setup();
+    uint8_t last_dma_count = get_dma_count();
+    
     while(1)
     {
         loop();
-        if (DMA_GetFlagStatus(DMA1_FLAG_TC5) != RESET) {
-            DMA_ClearFlag(DMA1_FLAG_TC5);
-            uint16_t cnt = DMA_GetCurrDataCounter(DMA1_Channel5);
-            printf("DMA_GetFlagStatus %d\r\n", cnt);
+        uint8_t current_dma_count = get_dma_count();
+        
+        if (current_dma_count != last_dma_count)
+        {
+            printf("dma cnt %d recv: [", current_dma_count);
+            for (uint8_t i = 0; i < sizeof(RxDmaBuffer) - 1; ++i) {
+                printf("%02X ", RxDmaBuffer[i]);
+            }
+            printf("%02X]\r\n", RxDmaBuffer[sizeof(RxDmaBuffer) - 1]);
         }
+        last_dma_count = current_dma_count;
     }
 }
 
@@ -122,7 +146,7 @@ void reboot_bootloader()
 void EXTI7_0_IRQHandler(void)
 {
     // go to bootloader
-    if(EXTI_GetITStatus(EXTI_Line0)!=RESET)
+    if(EXTI_GetITStatus(EXTI_Line0) != RESET)
     {
         EXTI_ClearITPendingBit(EXTI_Line0);     /* Clear Flag */
         reboot_bootloader();
@@ -138,17 +162,6 @@ void delayMicroseconds(unsigned int us)
 {
     Delay_Us(us);
 }
-
-unsigned long micros(void)
-{
-    return Systick_micros();
-}
-
-unsigned long millis(void)
-{
-    return Systick_micros()/1000;
-}
-// Arduino-like API defines and function wrappers for WCH MCUs
 
 void pinMode(uint8_t u8Pin, int iMode)
 {

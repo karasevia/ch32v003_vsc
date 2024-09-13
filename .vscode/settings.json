@@ -13,7 +13,8 @@
         "ch32v00x.h": "c",
         "debug.h": "c",
         "string.h": "c",
-        "arduino.h": "c"
+        "arduino.h": "c",
+        "ch32v00x_dma.h": "c"
     },
     "cortex-debug.registerUseNaturalFormat": false,
     "cortex-debug.variableUseNaturalFormat": false,
