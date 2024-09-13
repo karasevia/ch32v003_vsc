@@ -6,7 +6,18 @@
         {
             "label": "flash with bootloader",
             "type": "shell",
-            "command": "\"C:\\work\\V003\\projects\\ch32v0-uprog.exe\"  --baud 460800 --device COM18 .\\build\\firmware.elf.bin"
+            "command": "\"C:\\work\\V003\\projects\\tools\\ch32v0-uprog.exe\"  --baud 460800 --device COM18 .\\build\\firmware.elf.bin"
+        },
+        {
+            "label": "send bootloader cmd",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "C:\\work\\V003\\projects\\tools\\serialsend.py",
+                "COM18",
+                "460800",
+                "command: reboot bootloader"
+            ],
         },
         {
             "label": "cmake build",
@@ -19,6 +30,15 @@
             "dependsOrder": "sequence",
             "dependsOn": [
                 "cmake build",
+                "flash with bootloader"
+            ]
+        },
+        {
+            "label": "auto update fw",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "cmake build",
+                "send bootloader cmd",
                 "flash with bootloader"
             ]
         }
