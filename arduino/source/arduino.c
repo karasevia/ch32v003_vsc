@@ -7,6 +7,7 @@
 #include "debug.h"
 #include "arduino.h"
 #include "ch32v00x_dma.h"
+#include "string.h"
 
 void GPIO_PD1_PA1_PA2_C0_Init(void)
 {
@@ -62,7 +63,7 @@ void GPIO_PD1_PA1_PA2_C0_Init(void)
 
 }
 
-static u8 RxDmaBuffer[30] = {0};
+static u8 RxDmaBuffer[100] = {0};
 
 /*********************************************************************
  * @fn      DMA_INIT
@@ -94,9 +95,82 @@ void DMA_INIT(void)
     DMA_Cmd(DMA1_Channel5, ENABLE); /* USART1 Rx */
 }
 
+void TIM_INIT(void)
+{
+    TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure={0};
+
+    RCC_APB2PeriphClockCmd( RCC_APB2Periph_TIM1, ENABLE );
+
+    TIM_TimeBaseInitStructure.TIM_Period = 60000;
+    TIM_TimeBaseInitStructure.TIM_Prescaler = 48000-1;
+    TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TimeBaseInit( TIM1, &TIM_TimeBaseInitStructure);
+
+    TIM_CtrlPWMOutputs(TIM1, ENABLE );
+    TIM_ARRPreloadConfig( TIM1, ENABLE );
+    
+    TIM_Cmd( TIM1, ENABLE );
+    
+}
+
+void uart_timer_stop()
+{
+    TIM_Cmd( TIM1, DISABLE );
+    TIM_SetCounter( TIM1, 0 );
+}
+
+void uart_timer_start()
+{
+    TIM_Cmd( TIM1, ENABLE );
+    TIM_SetCounter( TIM1, 0 );
+}
+
+uint8_t uart_timer_check()
+{
+    if (TIM_GetCounter(TIM1) > 100) {
+        uart_timer_stop();
+        return 1;
+    }
+    return 0;
+}
+
 uint8_t get_dma_count()
 {
     return sizeof(RxDmaBuffer) - DMA_GetCurrDataCounter(DMA1_Channel5);
+}
+
+int8_t get_dma_string(uint8_t start, uint8_t end, uint8_t max_size, uint8_t* str)
+{
+    uint8_t len = 0;
+    for (uint8_t s = start; s != end; s = (s + 1) % sizeof(RxDmaBuffer)) {
+        str[len++] = RxDmaBuffer[s];
+        if (len >= max_size)
+        {
+            return len;
+        }
+    }
+    return len;
+}
+
+void reboot(uint8_t bootloader)
+{
+    RCC_ClearFlag();
+    if (bootloader) SystemReset_StartMode(Start_Mode_BOOT);
+    else SystemReset_StartMode(Start_Mode_USER);
+    NVIC_SystemReset();
+}
+
+void try_run_uart_command(const char* cmd)
+{
+    if (strcmp(cmd, "command: reboot bootloader") == 0)
+    {
+        reboot(1);
+    }
+    else if (strcmp(cmd, "command: reboot") == 0)
+    {
+        reboot(0);
+    }
 }
 
 int main(void)
@@ -107,35 +181,39 @@ int main(void)
     DMA_INIT();
     USART_Printf_Init(serial_baudrate);
     USART_DMACmd(USART1, USART_DMAReq_Rx, ENABLE);
+    TIM_INIT();
 
     setup();
+
     uint8_t last_dma_count = get_dma_count();
-    
+    uint8_t last_dma_check = last_dma_count;
+
     while(1)
     {
         loop();
-        uint8_t current_dma_count = get_dma_count();
         
+        uint8_t current_dma_count = get_dma_count();
         if (current_dma_count != last_dma_count)
         {
-            printf("dma cnt %d recv: [", current_dma_count);
-            for (uint8_t i = 0; i < sizeof(RxDmaBuffer) - 1; ++i) {
-                printf("%02X ", RxDmaBuffer[i]);
-            }
-            printf("%02X]\r\n", RxDmaBuffer[sizeof(RxDmaBuffer) - 1]);
+            uart_timer_start();
         }
         last_dma_count = current_dma_count;
+
+        if (uart_timer_check()) 
+        {
+            char command[30] = {0};
+            if (get_dma_string(last_dma_check, current_dma_count, sizeof(command) - 1, command) > 0)
+            {   
+                printf("try_run_uart_command %d %d [%s]\r\n", last_dma_check, current_dma_count, command);
+                try_run_uart_command(command);
+            }
+            last_dma_check = current_dma_count; 
+        }
     }
 }
 
 void EXTI7_0_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 
-void reboot_bootloader()
-{
-    RCC_ClearFlag();
-    SystemReset_StartMode(Start_Mode_BOOT);
-    NVIC_SystemReset();
-}
 /*********************************************************************
  * @fn      EXTI0_IRQHandler
  *
@@ -149,7 +227,7 @@ void EXTI7_0_IRQHandler(void)
     if(EXTI_GetITStatus(EXTI_Line0) != RESET)
     {
         EXTI_ClearITPendingBit(EXTI_Line0);     /* Clear Flag */
-        reboot_bootloader();
+        reboot(1);
     }
 }
 
