@@ -39,6 +39,63 @@ void print_voltage(uint16_t voltage)
     oledWriteString(0, 0, msg, FONT_12x16, 0);
 }
 
+uint16_t flash_read_boot_word(uint16_t shift)
+{
+	const uint32_t address = 0x1FFFF000 + shift;
+	return (*(__IO uint16_t *)address);
+}
+
+void print_boot_sector(uint8_t sector)
+{
+	printf("read flash %d: ", sector);
+	for (int i = 0; i < 32; ++i) {
+		if (i % 8 == 0) printf("\r\n");
+		printf("%04X ", flash_read_boot_word(sector * 64 + i * 2));
+	}
+	printf("\r\n");
+}
+
+void erase_boot_sector_page(uint8_t p)
+{
+	const uint32_t address = 0x1FFFF000 + 64 * p;
+
+	printf("erase_boot_sector_page %d\r\n", p);
+
+	FLASH_ErasePage_Fast(address);
+}
+
+void CH32_IAP_Program(u32 adr, u32* buf)
+{
+    adr &= 0xFFFFFFC0;
+    FLASH_BufReset();
+    for(int j=0;j<16;j++)
+       {
+           FLASH_BufLoad(adr+4*j, buf[j]);
+
+       }
+    FLASH_ProgramPage_Fast(adr);
+}
+
+void write_some_data_to_sector(uint8_t p)
+{
+	const uint32_t address = 0x1FFFF000 + 64 * p;
+	
+	printf("write_some_data_to_sector %d\r\n", p);
+
+	// FLASH_BufLoad(address, );
+
+	// FLASH_ProgramPage_Fast(address);
+
+	// FLASH_Status FLASHStatus = FLASH_ProgramHalfWord(address, 0x1111);
+
+	FLASH_Unlock_Fast();
+	FLASH_BufReset();
+	FLASH_BufLoad(address, 0x11111111);
+    FLASH_ProgramPage_Fast(address);
+
+	// printf("flash write status: %d\r\n", FLASHStatus);
+}
+
 void loop() {
 	static uint8_t led = 0;
 	static uint8_t last_c4 = 0;
@@ -72,6 +129,17 @@ void loop() {
 		if (mode == 0) {
 			mode = 1;
 			oledFill(0);
+		}
+		{
+			FLASH_Unlock_Fast();
+			FLASH_ReadOutProtection(DISABLE);
+
+			// erase_boot_sector_page(0);
+			// print_boot_sector(29);
+			write_some_data_to_sector(29);
+			print_boot_sector(29);
+		
+			FLASH_Lock_Fast();
 		}
 	}
 	last_c4 = c4;

@@ -17,50 +17,56 @@ void GPIO_PD1_PA1_PA2_C0_Init(void)
 
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO | RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD, ENABLE);
 
-    /* PC0 - boot button */
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
-    GPIO_Init(GPIOC, &GPIO_InitStructure);
+    #ifdef USE_PC0_AS_BOOT_SOURCE
+    {
+        /* PC0 - boot button */
+        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+        GPIO_Init(GPIOC, &GPIO_InitStructure);
 
-    /* GPIOA ----> EXTI_Line0 */
-    GPIO_EXTILineConfig(GPIO_PortSourceGPIOC, GPIO_PinSource0);
-    EXTI_InitStructure.EXTI_Line = EXTI_Line0;
-    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;
-    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-    EXTI_Init(&EXTI_InitStructure);
+        /* GPIOC ----> EXTI_Line7 */
+        GPIO_EXTILineConfig(GPIO_PortSourceGPIOC, GPIO_PinSource0);
+        EXTI_InitStructure.EXTI_Line = EXTI_Line0;
+        EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+        EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;
+        EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+        EXTI_Init(&EXTI_InitStructure);
 
-    NVIC_InitStructure.NVIC_IRQChannel = EXTI7_0_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
+        NVIC_InitStructure.NVIC_IRQChannel = EXTI7_0_IRQn;
+        NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+        NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+        NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+        NVIC_Init(&NVIC_InitStructure);
+    }
+    #endif // USE_PC0_AS_BOOT_SOURCE
 
+    #ifdef USE_PROGRAMMING_PIN_AS_GPIO
     { // init D1 as GPIO
         GPIOD->CFGLR &= ~( 0b11 << 6 );\
         u32 tmp = AFIO->PCFR1 & (~(0b111 << 24));
         tmp |= 0b100 << 24;
         AFIO->PCFR1 |= tmp;
-    }
 
+        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+        GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+        GPIO_Init(GPIOD, &GPIO_InitStructure);
+    }
+    #endif // USE_PROGRAMMING_PIN_AS_GPIO
+
+    #ifdef USE_XTAL_PINS_AS_GPIO
     { // init A1 A2 as GPIO
         AFIO->PCFR1 &= ~0x8000;
+
+        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+        GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+        GPIO_Init(GPIOA, &GPIO_InitStructure);
     }
-
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-    GPIO_Init(GPIOD, &GPIO_InitStructure);
-
-
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
-
+    #endif // USE_XTAL_PINS_AS_GPIO
 }
 
 static u8 RxDmaBuffer[100] = {0};
@@ -110,8 +116,7 @@ void TIM_INIT(void)
     TIM_CtrlPWMOutputs(TIM1, ENABLE );
     TIM_ARRPreloadConfig( TIM1, ENABLE );
     
-    TIM_Cmd( TIM1, ENABLE );
-    
+    TIM_Cmd( TIM1, ENABLE );   
 }
 
 void uart_timer_stop()
@@ -180,18 +185,22 @@ int main(void)
 
     DMA_INIT();
     USART_Printf_Init(serial_baudrate);
-    USART_DMACmd(USART1, USART_DMAReq_Rx, ENABLE);
-    TIM_INIT();
 
     setup();
 
+    #ifdef UART_COMMANDS_RECEIVE_SERVICE
+    USART_DMACmd(USART1, USART_DMAReq_Rx, ENABLE);
+    TIM_INIT();
+
     uint8_t last_dma_count = get_dma_count();
     uint8_t last_dma_check = last_dma_count;
+    #endif // UART_COMMANDS_RECEIVE_SERVICE
 
     while(1)
     {
         loop();
         
+        #ifdef UART_COMMANDS_RECEIVE_SERVICE
         uint8_t current_dma_count = get_dma_count();
         if (current_dma_count != last_dma_count)
         {
@@ -209,9 +218,11 @@ int main(void)
             }
             last_dma_check = current_dma_count; 
         }
+        #endif // UART_COMMANDS_RECEIVE_SERVICE
     }
 }
 
+#ifdef USE_PC0_AS_BOOT_SOURCE
 void EXTI7_0_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 
 /*********************************************************************
@@ -230,6 +241,7 @@ void EXTI7_0_IRQHandler(void)
         reboot(1);
     }
 }
+#endif // USE_PC0_AS_BOOT_SOURCE
 
 void delay(unsigned int i)
 {

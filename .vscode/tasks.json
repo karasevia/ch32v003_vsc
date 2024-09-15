@@ -20,6 +20,17 @@
             ],
         },
         {
+            "label": "send reboot cmd",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "C:\\work\\V003\\projects\\tools\\serialsend.py",
+                "COM18",
+                "460800",
+                "command: reboot"
+            ],
+        },
+        {
             "label": "cmake build",
             "type": "shell",
             "command": "cmake --build ${command:cmake.buildDirectory} --config Debug --target all",
