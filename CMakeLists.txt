@@ -4,7 +4,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(firmware)
 
-# add_compile_definitions(USE_PROGRAMMING_PIN_AS_GPIO)
+add_compile_definitions(USE_PROGRAMMING_PIN_AS_GPIO)
 add_compile_definitions(USE_XTAL_PINS_AS_GPIO)
 add_compile_definitions(UART_COMMANDS_RECEIVE_SERVICE)
 add_compile_definitions(USE_PC0_AS_BOOT_SOURCE)

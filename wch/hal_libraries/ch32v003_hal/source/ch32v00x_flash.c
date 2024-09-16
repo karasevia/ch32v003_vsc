@@ -754,7 +754,7 @@ void FLASH_BufReset(void)
  */
 void FLASH_BufLoad(uint32_t Address, uint32_t Data0)
 {
-    // if((Address >= ValidAddrStart) && (Address < ValidAddrEnd))
+    if((Address >= ValidAddrStart) && (Address < ValidAddrEnd))
     {
         FLASH->CTLR |= CR_PAGE_PG;
         *(__IO uint32_t *)(Address) = Data0;
@@ -776,7 +776,7 @@ void FLASH_BufLoad(uint32_t Address, uint32_t Data0)
  */
 void FLASH_ErasePage_Fast(uint32_t Page_Address)
 {
-    // if((Page_Address >= ValidAddrStart) && (Page_Address < ValidAddrEnd))
+    if((Page_Address >= ValidAddrStart) && (Page_Address < ValidAddrEnd))
     {
         FLASH->CTLR |= CR_PAGE_ER;
         FLASH->ADDR = Page_Address;
@@ -798,7 +798,7 @@ void FLASH_ErasePage_Fast(uint32_t Page_Address)
  */
 void FLASH_ProgramPage_Fast(uint32_t Page_Address)
 {
-    // if((Page_Address >= ValidAddrStart) && (Page_Address < ValidAddrEnd))
+    if((Page_Address >= ValidAddrStart) && (Page_Address < ValidAddrEnd))
     {
         FLASH->CTLR |= CR_PAGE_PG;
         FLASH->ADDR = Page_Address;
