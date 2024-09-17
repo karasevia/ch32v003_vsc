@@ -14,7 +14,6 @@ int main();
 void setup();
 void loop();
 
-
 #define A1 0xA1
 #define A2 0xA2
 
@@ -50,6 +49,10 @@ enum {
 	INPUT_PULLDOWN
 };
 
+typedef struct {
+	uint8_t data[62];
+} config_t;
+
 #define PROGMEM
 #define memcpy_P memcpy
 #define pgm_read_byte(s) *(uint8_t *)s
@@ -61,6 +64,9 @@ void delay(unsigned int i);
 void delayMicroseconds(unsigned int us);
 unsigned long micros(void);
 unsigned long millis(void);
+
+void save_config(config_t* config);
+void read_config(config_t* config);
 
 //
 // Digital pin functions use a numbering scheme to make it easier to map the

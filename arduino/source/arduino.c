@@ -237,7 +237,7 @@ void EXTI7_0_IRQHandler(void)
     // go to bootloader
     if(EXTI_GetITStatus(EXTI_Line0) != RESET)
     {
-        EXTI_ClearITPendingBit(EXTI_Line0);     /* Clear Flag */
+        EXTI_ClearITPendingBit(EXTI_Line0); /* Clear Flag */
         reboot(1);
     }
 }
@@ -359,3 +359,75 @@ void Standby82ms(uint8_t iTicks)
     GPIO_DeInit(GPIOD);
 
 } /* Standby82ms() */
+
+
+static uint8_t calc_config_crc(config_t* config) {
+	uint8_t res = 0x33;
+	// simple crc
+	for (u8 i = 0; i < sizeof(config_t); ++i) {
+		res |= config->data[i];
+		res += config->data[i] + 0xAA;
+	}
+	return res;
+}
+
+static u32 sector_address(u32 s) {
+	return FLASH_BASE + s * 64;
+}
+
+static void write_config_to_sector(config_t* config, u8 s)
+{
+	FLASH_ErasePage_Fast(sector_address(s));
+	FLASH_BufReset();
+	for (u8 i = 0; i < 60; i += 4) {
+		FLASH_BufLoad(sector_address(s) + i, *(u32*)(&config->data[i]));
+	}
+	u8 tmp[4];
+	tmp[0] = config->data[60];
+	tmp[1] = config->data[61];
+	tmp[2] = calc_config_crc(config);
+	tmp[3] = 0x33;
+	FLASH_BufLoad(sector_address(s) + 60, *(u32*)(tmp));
+	FLASH_ProgramPage_Fast(sector_address(s));
+}
+
+void save_config(config_t* config) {
+	u8 i;
+	for (i = 0; i < sizeof(config_t); ++i) {
+		if (config->data[i] != *(u8*)(sector_address(254) + i)) break;
+	}
+	if (i == sizeof(config_t)) {
+		return;
+	}
+	FLASH_Unlock_Fast();
+	write_config_to_sector(config, 255);
+	write_config_to_sector(config, 254);
+	FLASH_ErasePage_Fast(sector_address(255));
+	FLASH_Lock_Fast();
+}
+
+static u8 read_config_from_sector(config_t* config, u8 s) {
+	u8 status = *(u8*)(sector_address(s) + 63);
+	if (status != 0x33) {
+		return 0;
+	}
+	for (u8 i = 0; i < sizeof(config_t); ++i) {
+		config->data[i] = *(u8*)(sector_address(s) + i);
+	}
+	u8 crc = calc_config_crc(config);
+	u8 readed = *(u8*)(sector_address(s) + 62);
+	if (crc != readed) {
+		return 0;
+	}
+	return 1;
+}
+
+void read_config(config_t* config) {
+	if (read_config_from_sector(config, 255) || read_config_from_sector(config, 254)) {
+        save_config(config);
+		return;
+	}
+	for (u8 i = 0; i < sizeof(config_t); ++i) {
+		config->data[i] = 0;
+	}
+}
