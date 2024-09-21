@@ -168,13 +168,36 @@ void reboot(uint8_t bootloader)
 
 void try_run_uart_command(const char* cmd)
 {
-    if (strcmp(cmd, "command: reboot bootloader") == 0)
+    const char prefix[] = "command: ";
+    if (strlen(cmd) < sizeof(prefix) || strncmp(cmd, prefix, sizeof(prefix) - 1) != 0) {
+        return;
+    }
+    cmd += sizeof(prefix) - 1;
+    printf("command [%s]\r\n", cmd);
+
+    if (strcmp(cmd, "reboot bootloader") == 0)
     {
         reboot(1);
     }
-    else if (strcmp(cmd, "command: reboot") == 0)
+    else if (strcmp(cmd, "reboot") == 0)
     {
         reboot(0);
+    }
+    else if (strcmp(cmd, "read bootloader info") == 0)
+    {
+        u8 i = 0;
+        const char* boot_info = BOOT_INFO;
+        for (; i < 64; ++i) {
+            if (boot_info[i] == '\0') {
+                printf("%s\r\n", boot_info);
+                break;
+            }
+        }
+        if (i == 64) {
+            printf("no boot info\r\n");
+        }
+    } else {
+        command_callback(cmd);
     }
 }
 
@@ -213,7 +236,7 @@ int main(void)
             char command[30] = {0};
             if (get_dma_string(last_dma_check, current_dma_count, sizeof(command) - 1, command) > 0)
             {   
-                printf("try_run_uart_command %d %d [%s]\r\n", last_dma_check, current_dma_count, command);
+                printf("try_run_uart_command [%s]\r\n", command);
                 try_run_uart_command(command);
             }
             last_dma_check = current_dma_count; 
@@ -319,47 +342,6 @@ void digitalWrite(uint8_t u8Pin, uint8_t u8Value)
 		break;
 	}
 } /* digitalWrite() */
-
-// Put CPU into standby mode for a multiple of 82ms tick increments
-// max ticks value is 63
-void Standby82ms(uint8_t iTicks)
-{
-    EXTI_InitTypeDef EXTI_InitStructure = {0};
-    GPIO_InitTypeDef GPIO_InitStructure = {0};
-
-    // init external interrupts
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
-
-    EXTI_InitStructure.EXTI_Line = EXTI_Line9;
-    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Event;
-    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
-    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-    EXTI_Init(&EXTI_InitStructure);
-
-    // Init GPIOs
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD, ENABLE);
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_All;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
-
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
-    GPIO_Init(GPIOC, &GPIO_InitStructure);
-    GPIO_Init(GPIOD, &GPIO_InitStructure);
-
-    // init wake up timer and enter standby mode
-    RCC_LSICmd(ENABLE);
-    while(RCC_GetFlagStatus(RCC_FLAG_LSIRDY) == RESET);
-    PWR_AWU_SetPrescaler(PWR_AWU_Prescaler_10240);
-    PWR_AWU_SetWindowValue(iTicks);
-    PWR_AutoWakeUpCmd(ENABLE);
-    PWR_EnterSTANDBYMode(PWR_STANDBYEntry_WFE);
-
-    GPIO_DeInit(GPIOA);
-    GPIO_DeInit(GPIOC);
-    GPIO_DeInit(GPIOD);
-
-} /* Standby82ms() */
-
 
 static uint8_t calc_config_crc(config_t* config) {
 	uint8_t res = 0x33;

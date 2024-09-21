@@ -58,6 +58,7 @@ typedef struct {
 #define pgm_read_byte(s) *(uint8_t *)s
 #define pgm_read_word(s) *(uint16_t *)s
 #define serial_baudrate 460800
+#define BOOT_INFO ((const char*)0x1FFFF740)
 
 // Wrapper methods
 void delay(unsigned int i);
@@ -67,6 +68,7 @@ unsigned long millis(void);
 
 void save_config(config_t* config);
 void read_config(config_t* config);
+void command_callback(const char* cmd);
 
 //
 // Digital pin functions use a numbering scheme to make it easier to map the
@@ -77,11 +79,5 @@ void read_config(config_t* config);
 void pinMode(uint8_t u8Pin, int iMode);
 uint8_t digitalRead(uint8_t u8Pin);
 void digitalWrite(uint8_t u8Pin, uint8_t u8Value);
-
-
-// Random stuff
-void Standby82ms(uint8_t iTicks);
-void breatheLED(uint8_t u8Pin, int iPeriod);
-
 
 #endif /* USER_ARDUINO_H_ */

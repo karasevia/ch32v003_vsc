@@ -31,6 +31,39 @@
             ],
         },
         {
+            "label": "read bootloader info",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "C:\\work\\V003\\projects\\tools\\serialsend.py",
+                "COM18",
+                "460800",
+                "command: read bootloader info"
+            ],
+        },
+        {
+            "label": "mode 0",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "C:\\work\\V003\\projects\\tools\\serialsend.py",
+                "COM18",
+                "460800",
+                "command: mode 0"
+            ],
+        },
+        {
+            "label": "mode 1",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "C:\\work\\V003\\projects\\tools\\serialsend.py",
+                "COM18",
+                "460800",
+                "command: mode 1"
+            ],
+        },
+        {
             "label": "cmake build",
             "type": "shell",
             "command": "cmake --build ${command:cmake.buildDirectory} --config Debug --target all",

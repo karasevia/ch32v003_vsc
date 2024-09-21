@@ -4,7 +4,15 @@
 #include "ik_ina219.h"
 // the setup function runs once when you press reset or power the board
 
-config_t current_config;
+union config_u
+{
+    config_t raw;
+    struct
+	{
+		s16 current_calibration;
+		u8 mode;
+	};
+} config;
 
 void setup() {
   // initialize digital pin LED_BUILTIN as an output.
@@ -12,7 +20,7 @@ void setup() {
     pinMode(D2, INPUT_PULLDOWN);
     pinMode(C3, INPUT_PULLUP);
     pinMode(C4, INPUT_PULLUP);
-	read_config(&current_config);
+	read_config(&config.raw);
 	INA219_Init(INA219_ADDRESS, 400000);
 	oledInit(0x3c, 400000);
 	oledFill(0);
@@ -46,15 +54,15 @@ void loop() {
 	static uint8_t last_c4 = 0;
 	uint16_t bus_voltage = INA219_ReadBusVoltage();
 	int16_t current = -INA219_ReadCurrent();
-	int16_t current_calibration = *(s16*)(&current_config.data[0]);
 
+	delay(100);
 	digitalWrite(LED_BUILTIN, led = !led);
 
 	if (mode == 0) {
 		print_voltage(bus_voltage);
-		print_current("I", current - current_calibration, 24);
+		print_current("I", current - config.current_calibration, 24);
 	} else if (mode == 1) {
-		print_current("C", current_calibration, 0);
+		print_current("C", config.current_calibration, 0);
 		print_current("R", current, 24);
 	}
 
@@ -70,18 +78,37 @@ void loop() {
 	if (c4 && c4 != last_c4) {
 		printf("button C4\r\n");
 		if (mode == 1) {
-			current_calibration = current;
+			config.current_calibration = current;
+			save_config(&config.raw);
 		}
 		if (mode == 0) {
 			mode = 1;
 			oledFill(0);
 		}
-		{
-			*(s16*)(&current_config.data[0]) = current_calibration;
-			save_config(&current_config);
-		}
 	}
 	last_c4 = c4;
 
-	// printf(">voltage:%d,current:%d\r\n", bus_voltage, current - current_calibration);
+	if (config.mode) {
+		printf(">voltage:%d,current:%d\r\n", bus_voltage, current - config.current_calibration);
+	}
+}
+
+void command_callback(const char* cmd)
+{
+	{
+		const char prefix[] = "mode ";
+		if (strlen(cmd) < sizeof(prefix)) {
+			printf("argument error");
+			return;
+		}
+		if (strncmp(cmd, prefix, sizeof(prefix) - 1) == 0) {
+			switch (cmd[sizeof(prefix) - 1]) {
+				case '0': config.mode = 0; break;
+				case '1': config.mode = 1; break;
+				default: printf("argument error"); return;
+			}
+			save_config(&config.raw);
+			printf("mode changed to %d\r\n", config.mode);
+		}
+	}
 }
